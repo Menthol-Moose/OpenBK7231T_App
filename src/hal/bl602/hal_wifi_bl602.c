@@ -42,6 +42,48 @@ static int g_bAccessPointMode = 0;
 static void (*g_wifiStatusCallback)(int code);
 
 extern bool g_powersave;
+
+#if PLATFORM_BL602 && !PLATFORM_BL_NEW
+// Optional fixed Wi-Fi transmit rate (802.11n MCS 0-7); -1 = SDK automatic rate control.
+// The SDK only accepts ME_RC_SET_RATE_REQ in the "connected with IP" state, and the
+// firmware resets the fixed rate whenever a new association is set up (rc_init),
+// so the setting is re-applied on every CODE_WIFI_ON_GOT_IP.
+static int g_bl602_fixedMcs = -1;
+
+static void BL602_ApplyFixedRate(void)
+{
+	uint16_t rc;
+
+	if(g_bl602_fixedMcs < 0)
+	{
+		rc = 0xFFFF; // RC_FIXED_RATE_NOT_SET: back to automatic rate control
+	}
+	else
+	{
+		// RivieraWaves rate config: [6:0] MCS, [8:7] BW (0 = 20 MHz),
+		// [10:9] GI (0 = long), [13:11] format (2 = HT mixed mode).
+		// Same encoding as the SDK CLI "rc_fix_en 1 <mcs> 0".
+		rc = (2 << 11) | (0 << 9) | (0 << 7) | (g_bl602_fixedMcs & 0x07);
+	}
+	ADDLOG_INFO(LOG_FEATURE_GENERAL, "WiFiFixRate: rate config 0x%04X", rc);
+	wifi_mgmr_rate_config(rc);
+}
+
+void HAL_BL602_SetFixedMcs(int mcs, int bApplyNow)
+{
+	g_bl602_fixedMcs = mcs;
+	if(bApplyNow)
+	{
+		BL602_ApplyFixedRate();
+	}
+}
+
+int HAL_BL602_GetFixedMcs(void)
+{
+	return g_bl602_fixedMcs;
+}
+#endif
+
 __attribute__((aligned(32))) static obkFastConnectData_t fcdata = { 0 };
 extern uint16_t phy_channel_to_freq(uint8_t band, int channel);
 
@@ -241,6 +283,9 @@ static void wifi_event_handler(input_event_t* event, void* private_data)
 
 #if PLATFORM_BL602
 			if(g_powersave) wifi_mgmr_sta_ps_enter(2);
+#if !PLATFORM_BL_NEW
+			if(g_bl602_fixedMcs >= 0) BL602_ApplyFixedRate();
+#endif
 
 			if(CFG_HasFlag(OBK_FLAG_WIFI_ENHANCED_FAST_CONNECT))
 			{
