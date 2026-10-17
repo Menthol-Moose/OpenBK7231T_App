@@ -133,7 +133,6 @@ void HAL_BL602_SetFixedMcs(int mcs, int bApplyNow);
 int HAL_BL602_GetFixedMcs(void);
 static commandResult_t CMD_WiFiFixRate(const void* context, const char* cmd, const char* args, int cmdFlags) {
 	int mcs;
-
 	Tokenizer_TokenizeString(args, 0);
 	if (Tokenizer_GetArgsCount() < 1) {
 		ADDLOG_INFO(LOG_FEATURE_CMD, "WiFiFixRate: current %i (-1 = automatic)", HAL_BL602_GetFixedMcs());
