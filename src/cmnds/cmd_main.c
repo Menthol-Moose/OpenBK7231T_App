@@ -128,6 +128,25 @@ void LN882H_ApplyPowerSave(int bOn) {
 }
 #endif
 
+#if PLATFORM_BL602 && !PLATFORM_BL_NEW
+void HAL_BL602_SetFixedMcs(int mcs, int bApplyNow);
+int HAL_BL602_GetFixedMcs(void);
+static commandResult_t CMD_WiFiFixRate(const void* context, const char* cmd, const char* args, int cmdFlags) {
+	int mcs;
+
+	Tokenizer_TokenizeString(args, 0);
+	if (Tokenizer_GetArgsCount() < 1) {
+		ADDLOG_INFO(LOG_FEATURE_CMD, "WiFiFixRate: current %i (-1 = automatic)", HAL_BL602_GetFixedMcs());
+		return CMD_RES_OK;
+	}
+	mcs = Tokenizer_GetArgIntegerRange(0, -1, 7);
+	ADDLOG_INFO(LOG_FEATURE_CMD, "WiFiFixRate: set to %i%s", mcs,
+		Main_IsConnectedToWiFi() ? "" : " (will be applied when Wi-Fi connects)");
+	HAL_BL602_SetFixedMcs(mcs, Main_IsConnectedToWiFi());
+	return CMD_RES_OK;
+}
+#endif
+
 static commandResult_t CMD_PowerSave(const void* context, const char* cmd, const char* args, int cmdFlags) {
 	int bOn = 1;
 	Tokenizer_TokenizeString(args, 0);
@@ -1134,6 +1153,13 @@ void CMD_Init_Early() {
 	//cmddetail:"fn":"CMD_PowerSave","file":"cmnds/cmd_main.c","requires":"",
 	//cmddetail:"examples":""}
 	CMD_RegisterCommand("PowerSave", CMD_PowerSave, NULL);
+	#if PLATFORM_BL602 && !PLATFORM_BL_NEW
+	//cmddetail:{"name":"WiFiFixRate","args":"[MCS 0-7, or -1 for automatic]",
+	//cmddetail:"descr":"BL602 only. Fixes the Wi-Fi transmit rate to 802.11n MCS 0-7 (20 MHz, long GI), or -1 to restore automatic rate control. Re-applied on every connection. Without an argument, prints the current setting.",
+	//cmddetail:"fn":"CMD_WiFiFixRate","file":"cmnds/cmd_main.c","requires":"",
+	//cmddetail:"examples":"WiFiFixRate 2"}
+	CMD_RegisterCommand("WiFiFixRate", CMD_WiFiFixRate, NULL);
+	#endif
 	//cmddetail:{"name":"PowerSave_WFI","args":"[Optional 1 or 0, by default 1 is assumed]",
 	//cmddetail:"descr":"Extra power save by sleeping during idle. Available on Beken, BL602, XR8xx, Realteks, W600 and W800. Reduces current by 0.001-0.002A on Beken. Enabled by default on BL602/W600/W800 (SDK behaviour).",
 	//cmddetail:"fn":"CMD_PowerSave_WFI","file":"cmnds/cmd_main.c","requires":"",
